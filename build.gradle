@@ -49,7 +49,6 @@ processResources {
 }
 
 jar {
-    archiveClassifier = 'universal'
     manifest {
         attributes 'FMLAT': 'tf_at.cfg'
     }
@@ -84,21 +83,21 @@ dependencies {
     // progwml6
     implementation rfg.deobf("mezz.jei:jei_${minecraft_version}:${jei_version}")
 
-    implementation rfg.deobf("slimeknights.mantle:Mantle:${minecraft_sub_version}-${mantle_version}")
-    implementation rfg.deobf("slimeknights:TConstruct:${minecraft_version}-${tcon_version}")
+    compileOnly rfg.deobf("slimeknights.mantle:Mantle:${minecraft_sub_version}-${mantle_version}")
+    compileOnly rfg.deobf("slimeknights:TConstruct:${minecraft_version}-${tcon_version}")
 
     // tterrag
-    implementation rfg.deobf("team.chisel.ctm:CTM:MC${minecraft_version}-${ctm_version}")
-    //implementation rfg.deobf("team.chisel:Chisel:MC${minecraft_version}-${chisel_version}")
+    compileOnly rfg.deobf("team.chisel.ctm:CTM:MC${minecraft_version}-${ctm_version}")
+    //compileOnly rfg.deobf("team.chisel:Chisel:MC${minecraft_version}-${chisel_version}")
 
     // blamejared
-    implementation rfg.deobf("blusunrize:ImmersiveEngineering:${immersive_engineering_version}")
-    implementation rfg.deobf("vazkii.patchouli:Patchouli:${patchouli_version}")
+    compileOnly rfg.deobf("blusunrize:ImmersiveEngineering:${immersive_engineering_version}")
+    compileOnly rfg.deobf("vazkii.patchouli:Patchouli:${patchouli_version}")
 
     // cursemaven
-    implementation rfg.deobf("curse.maven:forestry-59751:2918418")
-    implementation rfg.deobf("curse.maven:baubles-227083:2518667")
-    implementation rfg.deobf("curse.maven:thaumcraft-223628:2629023")
+    compileOnly rfg.deobf("curse.maven:forestry-59751:2918418")
+    compileOnly rfg.deobf("curse.maven:baubles-227083:2518667")
+    compileOnly rfg.deobf("curse.maven:thaumcraft-223628:2629023")
 }
 
 //task createPom {
