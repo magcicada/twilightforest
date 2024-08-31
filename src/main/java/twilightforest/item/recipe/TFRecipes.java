@@ -120,6 +120,7 @@ public class TFRecipes {
 		GameRegistry.addSmelting(TFItems.armor_shard_cluster, new ItemStack(TFItems.knightmetal_ingot), 1.0F);
 
 		event.getRegistry().register(new TFArmorDyeingRecipe().setRegistryName(TwilightForestMod.ID, "arctic_armor_dyeing"));
+		event.getRegistry().register(new TFScepterRepairing().setRegistryName(TwilightForestMod.ID, "scepter_repairing"));
 
 		event.getRegistry().register(new TFMapCloningRecipe(TFItems.magic_map, TFItems.magic_map_empty).setRegistryName(TwilightForestMod.ID, "magic_map_cloning"));
 		event.getRegistry().register(new TFMapCloningRecipe(TFItems.maze_map, TFItems.maze_map_empty).setRegistryName(TwilightForestMod.ID, "maze_map_cloning"));
