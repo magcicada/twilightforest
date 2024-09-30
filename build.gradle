@@ -19,6 +19,7 @@ targetCompatibility = JavaVersion.VERSION_1_8
 minecraft {
     mcVersion.set("1.12.2")
     useDependencyAccessTransformers = true
+    extraRunJvmArguments.addAll("-Xms128m", "-Xmx2048m")
     injectedTags.put('MOD_VERSION', project.version)
 }
 
