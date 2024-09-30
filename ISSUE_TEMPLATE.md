@@ -1,7 +1,5 @@
-
-Forge version: 
-Twilight Forest version: (this is the build number)
-Link to crash log: (please use a paste site such as [gist](https://gist.github.com/), do not attach the .txt or paste the log inline)
+Be sure to use latest Forge version and Twilight Forest version.
+Post crash report (or if there isn't log) to places such as [mclo.gs](https://mclo.gs) or [gist](https://gist.github.com/).
 
 Steps to reproduce:
 1. 
