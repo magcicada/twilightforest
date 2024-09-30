@@ -10,6 +10,7 @@ import net.minecraft.client.renderer.tileentity.TileEntitySpecialRenderer;
 import net.minecraft.inventory.EntityEquipmentSlot;
 import net.minecraft.item.ItemStack;
 import net.minecraft.util.ResourceLocation;
+import net.minecraft.util.math.MathHelper;
 import net.minecraftforge.client.ForgeHooksClient;
 import net.minecraftforge.client.event.ModelBakeEvent;
 import net.minecraftforge.common.MinecraftForge;
@@ -179,7 +180,7 @@ public class TileEntityTFTrophyRenderer extends TileEntitySpecialRenderer<TileEn
 				if (trophy == null) {
 					GlStateManager.translate(0.0F, -0.25F, transform == ItemCameraTransforms.TransformType.HEAD ? -0.125F : 0.0F);
 				}
-				renderHydraHead(rotation, onGround && trophy != null);
+				renderHydraHead(trophy, rotation, onGround && trophy != null, partialTime);
 				break;
 			case NAGA:
 				renderNagaHead(rotation, onGround);
@@ -214,21 +215,28 @@ public class TileEntityTFTrophyRenderer extends TileEntitySpecialRenderer<TileEn
 	/**
 	 * Render a hydra head
 	 */
-	private void renderHydraHead(float rotation, boolean onGround) {
+	private void renderHydraHead(@Nullable TileEntityTFTrophy trophy, float rotation, boolean onGround, float partialTicks) {
 		GlStateManager.scale(0.25f, 0.25f, 0.25f);
 
 		this.bindTexture(textureLocHydra);
 
 		GlStateManager.scale(1f, -1f, -1f);
 
-		// we seem to be getting a 180 degree rotation here
+		// we seem to be getting a 180-degree rotation here
 		GlStateManager.rotate(rotation, 0F, 1F, 0F);
 		GlStateManager.rotate(180F, 0F, 1F, 0F);
 
 		GlStateManager.translate(0, onGround ? 1F : -0F, 1.5F);
 
 		// open mouth?
-		hydraHeadModel.openMouthForTrophy(onGround ? 0F : 0.25F);
+		if (onGround) {
+			hydraHeadModel.openMouthForTrophy(0F);
+		}
+		else if (trophy != null) {
+			float ageInTicks = trophy.ticksExisted;
+			if (trophy.shouldAnimate()) ageInTicks += partialTicks;
+			hydraHeadModel.openMouthForTrophy(MathHelper.sin(ageInTicks) / 4 + 0.25F);
+		}
 
 		// render the hydra head
 		hydraHeadModel.render(null, 0.0F, 0.0F, 0.0F, rotation, 0.0F, 0.0625F);
@@ -288,10 +296,15 @@ public class TileEntityTFTrophyRenderer extends TileEntitySpecialRenderer<TileEn
 		GlStateManager.rotate(rotation, 0F, 1F, 0F);
 		GlStateManager.rotate(180F, 0F, 1F, 0F);
 
-		GlStateManager.translate(0, onGround ? 1F : 1F, onGround ? 0F : 0F);
+		GlStateManager.translate(0, 1F, 0F);
 
 		// render the head
-		urGhastModel.render(null, 0.0F, 0, trophy != null ? trophy.ticksExisted + partialTime : TFClientEvents.sineTicker + partialTime, 0, 0.0F, 0.0625F);
+		float ageInTicks = 0F;
+		if (trophy != null) {
+			ageInTicks = trophy.ticksExisted;
+			if (trophy.shouldAnimate()) ageInTicks += partialTime;
+		}
+		urGhastModel.render(null, 0.0F, 0, ageInTicks, 0, 0.0F, 0.0625F);
 	}
 
 	private void renderSnowQueenHead(float rotation, boolean onGround) {
