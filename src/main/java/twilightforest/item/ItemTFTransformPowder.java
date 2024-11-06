@@ -1,25 +1,20 @@
 package twilightforest.item;
 
-import it.unimi.dsi.fastutil.Hash;
-import it.unimi.dsi.fastutil.objects.Object2ObjectOpenCustomHashMap;
+import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import net.minecraft.block.Block;
+import net.minecraft.block.properties.IProperty;
+import net.minecraft.block.state.BlockStateContainer;
 import net.minecraft.block.state.IBlockState;
-import net.minecraft.client.Minecraft;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityList;
 import net.minecraft.entity.EntityLiving;
-import net.minecraft.entity.item.EntityItem;
 import net.minecraft.entity.player.EntityPlayer;
-import net.minecraft.init.Blocks;
 import net.minecraft.init.SoundEvents;
-import net.minecraft.item.Item;
-import net.minecraft.item.ItemBlock;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.util.*;
 import net.minecraft.util.math.AxisAlignedBB;
 import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.RayTraceResult;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.World;
 
@@ -27,35 +22,21 @@ import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.entity.player.PlayerInteractEvent;
 import net.minecraftforge.fml.common.eventhandler.Event;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
-import net.minecraftforge.oredict.OreDictionary;
+import org.apache.commons.lang3.tuple.Pair;
 import twilightforest.TwilightForestMod;
 import twilightforest.util.TFEntityNames;
 import twilightforest.util.VanillaEntityNames;
 
+import javax.annotation.Nullable;
 import java.util.*;
+import java.util.function.Predicate;
 
 public class ItemTFTransformPowder extends ItemTF {
 
-	public static Hash.Strategy<ItemStack> ITEMSTACK_STRATEGY = new Hash.Strategy<ItemStack>() {
-		@Override
-		public int hashCode(ItemStack o) {
-			if (o == null || o.isEmpty()) return 0;
-			int i = Item.getIdFromItem(o.getItem()) << 17;
-			i |= (o.getMetadata() + 1) << 31;
-			if (o.hasTagCompound()) i |= Objects.hashCode(o.getTagCompound()) << 13;
-			return i;
-		}
-
-		@Override
-		public boolean equals(ItemStack a, ItemStack b) {
-			if (a == null || b == null) return false;
-			boolean nbt = !a.hasTagCompound() || Objects.requireNonNull(a.getTagCompound()).equals(Objects.requireNonNull(b.getTagCompound()));
-			return a.isItemEqual(b) && nbt;
-		}
-	};
+	private static final Predicate<IBlockState> ALL = state -> true;
 
 	private static final Map<ResourceLocation, ResourceLocation> transformMap = new HashMap<>();
-	private static final Map<ItemStack, ItemStack> transformItemMap = new Object2ObjectOpenCustomHashMap<>(ITEMSTACK_STRATEGY);
+	private static final Map<Block, Pair<Predicate<IBlockState>, IBlockState>> transformBlockMap = new Object2ObjectOpenHashMap<>();
 
 	protected ItemTFTransformPowder() {
 		MinecraftForge.EVENT_BUS.register(this);
@@ -86,27 +67,31 @@ public class ItemTFTransformPowder extends ItemTF {
 		transformMap.put(from, to);
 	}
 
-	public static void addTwoWayTransformation(ItemStack from, ItemStack to) {
-		transformItemMap.put(from, to);
-		transformItemMap.put(to, from);
+	public static void addBlockTransformation(Block from, Predicate<IBlockState> predicate, IBlockState to) {
+		transformBlockMap.put(from, Pair.of(predicate, to));
 	}
 
-	public static void addOneWayTransformation(ItemStack from, ItemStack to) {
-		transformItemMap.put(from, to);
+	public static void addBlockTransformation(Block from, int meta, IBlockState to) {
+		addBlockTransformation(from, state -> from.getMetaFromState(state) == meta, to);
 	}
 
-	public static void addOneWayTransformation(Item from, ItemStack to) {
-		transformItemMap.put(new ItemStack(from, 1, OreDictionary.WILDCARD_VALUE), to);
+	public static void addBlockTransformation(IBlockState from, IBlockState to) {
+		addBlockTransformation(from.getBlock(), state -> state == from, to);
+	}
+
+	public static void addBlockTransformation(Block from, IBlockState to) {
+		addBlockTransformation(from, ALL, to);
 	}
 
 	public static ResourceLocation getTransformationEntity(ResourceLocation from) {
 		return transformMap.get(from);
 	}
 
-	public static ItemStack getTransformationItem(ItemStack from) {
-		ItemStack out = transformItemMap.get(from);
-		if (out == null) transformItemMap.get(new ItemStack(from.getItem(), 1, OreDictionary.WILDCARD_VALUE));
-		return out == null ? ItemStack.EMPTY : out;
+	@Nullable
+	public static IBlockState getTransformationBlock(IBlockState from) {
+		Pair<Predicate<IBlockState>, IBlockState> pair = transformBlockMap.get(from.getBlock());
+		if (pair == null) return null;
+		return pair.getKey().test(from) ? pair.getValue() : null;
 	}
 
 	@SuppressWarnings("unused")
@@ -163,125 +148,41 @@ public class ItemTFTransformPowder extends ItemTF {
 	public EnumActionResult onItemUse(EntityPlayer player, World world, BlockPos pos, EnumHand hand, EnumFacing facing, float hitX, float hitY, float hitZ) {
 		IBlockState state = world.getBlockState(pos);
 		ItemStack heldItem = player.getHeldItem(hand);
-		ItemStack stack = state.getBlock().getPickBlock(state, new RayTraceResult(RayTraceResult.Type.BLOCK, new Vec3d(hitX, hitY, hitZ), facing, pos), world, pos, player);
-		if (!stack.isEmpty()) {
-			ItemStack outStack = getTransformationItem(stack);
-			if (!outStack.isEmpty()) {
-				if (world.isRemote) {
-					AxisAlignedBB fanBox = getEffectAABB(player);
-					// particle effect
-					for (int i = 0; i < 30; i++) {
-						world.spawnParticle(EnumParticleTypes.CRIT_MAGIC, fanBox.minX + world.rand.nextFloat() * (fanBox.maxX - fanBox.minX),
-								fanBox.minY + world.rand.nextFloat() * (fanBox.maxY - fanBox.minY),
-								fanBox.minZ + world.rand.nextFloat() * (fanBox.maxZ - fanBox.minZ),
-								0, 0, 0);
-					}
-					return EnumActionResult.SUCCESS;
-				}
-				if (outStack.getItem() instanceof ItemBlock) {
-					ItemBlock itemBlock = (ItemBlock) outStack.getItem();
-					Block block = itemBlock.getBlock();
-					IBlockState placeState = block.getStateForPlacement(world, pos, facing, hitX, hitY, hitZ, itemBlock.getMetadata(stack.getMetadata()), player, hand);
-					world.setBlockState(pos, placeState);
-				}
-				else {
-					EntityItem entityItem = new EntityItem(world, pos.getX() + 0.5D, pos.getY() + 0.5D, pos.getZ() + 0.5D, outStack.copy());
-					entityItem.setPickupDelay(20);
-					world.spawnEntity(entityItem);
-					world.setBlockToAir(pos);
-				}
-				if (!player.isCreative()) heldItem.shrink(1);
-				this.spawnExplosionParticles(world, pos);
-				this.spawnExplosionParticles(world, pos);
-				world.playSound(null, pos, SoundEvents.ENTITY_ZOMBIE_VILLAGER_CURE, SoundCategory.BLOCKS, 1.0F + itemRand.nextFloat(), itemRand.nextFloat() * 0.7F + 0.3F);
-				return EnumActionResult.SUCCESS;
+		IBlockState stateOut = getTransformationBlock(state);
+		if (stateOut == null) return super.onItemUse(player, world, pos, hand, facing, hitX, hitY, hitZ);
+		if (world.isRemote) {
+			AxisAlignedBB fanBox = getEffectAABB(player);
+			// particle effect
+			for (int i = 0; i < 30; i++) {
+				world.spawnParticle(EnumParticleTypes.CRIT_MAGIC, fanBox.minX + world.rand.nextFloat() * (fanBox.maxX - fanBox.minX),
+						fanBox.minY + world.rand.nextFloat() * (fanBox.maxY - fanBox.minY),
+						fanBox.minZ + world.rand.nextFloat() * (fanBox.maxZ - fanBox.minZ),
+						0, 0, 0);
 			}
+			return EnumActionResult.SUCCESS;
 		}
-		return super.onItemUse(player, world, pos, hand, facing, hitX, hitY, hitZ);
+		world.setBlockState(pos, handleStateProperties(state, stateOut));
+		if (!player.isCreative()) heldItem.shrink(1);
+		this.spawnExplosionParticles(world, pos);
+		this.spawnExplosionParticles(world, pos);
+		world.playSound(null, pos, SoundEvents.ENTITY_ZOMBIE_VILLAGER_CURE, SoundCategory.BLOCKS, 1.0F + itemRand.nextFloat(), itemRand.nextFloat() * 0.7F + 0.3F);
+		return EnumActionResult.SUCCESS;
 	}
 
-	private boolean handleBlockTransformation(World world, BlockPos pos, RayTraceResult rayTrace, EntityPlayer player, EnumHand hand, float hitX, float hitY, float hitZ, IBlockState state, EnumFacing facing) {
-		ItemStack stack = state.getBlock().getPickBlock(state, rayTrace, world, pos, player);
-		if (!stack.isEmpty()) {
-			ItemStack outStack = getTransformationItem(stack);
-			if (!outStack.isEmpty()) {
-				if (world.isRemote) return true;
-				if (outStack.getItem() instanceof ItemBlock) {
-					ItemBlock itemBlock = (ItemBlock) outStack.getItem();
-					Block block = itemBlock.getBlock();
-					IBlockState placeState = block.getStateForPlacement(world, pos, facing, hitX, hitY, hitZ, itemBlock.getMetadata(stack.getMetadata()), player, hand);
-					world.setBlockState(pos, placeState);
-				}
-				else {
-					EntityItem entityItem = new EntityItem(world, pos.getX() + 0.5D, pos.getY() + 0.5D, pos.getZ() + 0.5D, outStack.copy());
-					entityItem.setPickupDelay(20);
-					world.spawnEntity(entityItem);
-					world.setBlockToAir(pos);
-				}
-				this.spawnExplosionParticles(world, pos);
-				this.spawnExplosionParticles(world, pos);
-				world.playSound(null, pos, SoundEvents.ENTITY_ZOMBIE_VILLAGER_CURE, SoundCategory.BLOCKS, 1.0F + itemRand.nextFloat(), itemRand.nextFloat() * 0.7F + 0.3F);
-				return true;
-			}
+	private static IBlockState handleStateProperties(IBlockState from, IBlockState to) {
+		BlockStateContainer containerFrom = from.getBlock().getBlockState();
+		BlockStateContainer containerTo = to.getBlock().getBlockState();
+		IProperty<?> axisFrom = containerFrom.getProperty("axis");
+		IProperty<?> axisTo = containerTo.getProperty("axis");
+		IProperty<?> facingFrom = containerFrom.getProperty("facing");
+		IProperty<?> facingTo = containerTo.getProperty("facing");
+		if (axisFrom != null && axisTo != null) {
+			to = to.withProperty((IProperty) axisTo, (Comparable) axisTo.parseValue(((IStringSerializable) from.getValue(axisFrom)).getName()));
 		}
-		return false;
-	}
-
-	private boolean handleEntityTransformation(World world, Entity entity) {
-		if (entity.isDead) return false;
-		if (entity instanceof EntityItem) {
-			EntityItem entityItem = (EntityItem) entity;
-			ItemStack stack = entityItem.getItem();
-			ItemStack out = getTransformationItem(stack);
-			if (!out.isEmpty()) {
-				if (stack.getCount() == 1) {
-					entityItem.setItem(out.copy());
-					entityItem.setPickupDelay(20);
-				}
-				else {
-					stack.shrink(1);
-					EntityItem outEntity = new EntityItem(world, entity.posX, entity.posY, entity.posZ, out.copy());
-					outEntity.setPickupDelay(20);
-					world.spawnEntity(outEntity);
-				}
-				this.spawnExplosionParticles(world, entity);
-				this.spawnExplosionParticles(world, entity);
-				entity.playSound(SoundEvents.ENTITY_ZOMBIE_VILLAGER_CURE, 1.0F + itemRand.nextFloat(), itemRand.nextFloat() * 0.7F + 0.3F);
-				return true;
-			}
+		if (facingFrom != null && facingTo != null) {
+			to = to.withProperty((IProperty) facingTo, (Comparable) facingTo.parseValue(((IStringSerializable) from.getValue(facingFrom)).getName()));
 		}
-		else {
-			ResourceLocation location = transformMap.get(EntityList.getKey(entity));
-			if (location == null) return false;
-			if (world.isRemote) return true;
-			Entity newEntity = EntityList.createEntityByIDFromName(location, world);
-			if (newEntity == null) return false;
-			newEntity.setLocationAndAngles(entity.posX, entity.posY, entity.posZ, entity.rotationYaw, entity.rotationPitch);
-			if (newEntity instanceof EntityLiving) {
-				((EntityLiving) newEntity).onInitialSpawn(world.getDifficultyForLocation(new BlockPos(entity)), null);
-			}
-			try { // try copying what can be copied
-				UUID uuid = newEntity.getUniqueID();
-				newEntity.readFromNBT(entity.writeToNBT(newEntity.writeToNBT(new NBTTagCompound())));
-				newEntity.setUniqueId(uuid);
-			} catch (Exception e) {
-				TwilightForestMod.LOGGER.warn("Couldn't transform entity NBT data: {}", e);
-			}
-			world.spawnEntity(newEntity);
-
-			if (entity instanceof EntityLiving) {
-				((EntityLiving) entity).spawnExplosionParticle();
-				((EntityLiving) entity).spawnExplosionParticle();
-			}
-			else {
-				this.spawnExplosionParticles(world, entity);
-				this.spawnExplosionParticles(world, entity);
-			}
-			entity.setDead();
-			entity.playSound(SoundEvents.ENTITY_ZOMBIE_VILLAGER_CURE, 1.0F + itemRand.nextFloat(), itemRand.nextFloat() * 0.7F + 0.3F);
-			return true;
-		}
-		return false;
+		return to;
 	}
 
 	private AxisAlignedBB getEffectAABB(EntityPlayer player) {
