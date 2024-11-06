@@ -26,6 +26,7 @@ import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.entity.player.PlayerInteractEvent;
 import net.minecraftforge.fml.common.eventhandler.Event;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
+import net.minecraftforge.oredict.OreDictionary;
 import twilightforest.TwilightForestMod;
 import twilightforest.util.TFEntityNames;
 import twilightforest.util.VanillaEntityNames;
@@ -93,12 +94,17 @@ public class ItemTFTransformPowder extends ItemTF {
 		transformItemMap.put(from, to);
 	}
 
+	public static void addOneWayTransformation(Item from, ItemStack to) {
+		transformItemMap.put(new ItemStack(from, 1, OreDictionary.WILDCARD_VALUE), to);
+	}
+
 	public static ResourceLocation getTransformationEntity(ResourceLocation from) {
 		return transformMap.get(from);
 	}
 
 	public static ItemStack getTransformationItem(ItemStack from) {
 		ItemStack out = transformItemMap.get(from);
+		if (out == null) transformItemMap.get(new ItemStack(from.getItem(), 1, OreDictionary.WILDCARD_VALUE));
 		return out == null ? ItemStack.EMPTY : out;
 	}
 
@@ -176,6 +182,7 @@ public class ItemTFTransformPowder extends ItemTF {
 		}
 
 		if (result) {
+			event.getEntityPlayer().swingArm(event.getHand());
 			if (!event.getEntityPlayer().isCreative()) heldItem.shrink(1);
 			if (entity instanceof EntityLiving) {
 				((EntityLiving) entity).spawnExplosionParticle();
