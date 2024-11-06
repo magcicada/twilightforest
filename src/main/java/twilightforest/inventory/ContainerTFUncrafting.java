@@ -1,5 +1,8 @@
 package twilightforest.inventory;
 
+import it.unimi.dsi.fastutil.Hash;
+import it.unimi.dsi.fastutil.objects.Object2ObjectOpenCustomHashMap;
+import it.unimi.dsi.fastutil.objects.ObjectOpenCustomHashSet;
 import net.minecraft.enchantment.Enchantment;
 import net.minecraft.enchantment.EnchantmentHelper;
 import net.minecraft.entity.player.EntityPlayer;
@@ -12,33 +15,84 @@ import net.minecraft.inventory.IInventory;
 import net.minecraft.inventory.InventoryCraftResult;
 import net.minecraft.inventory.InventoryCrafting;
 import net.minecraft.inventory.Slot;
-import net.minecraft.item.ItemArmor;
-import net.minecraft.item.ItemAxe;
-import net.minecraft.item.ItemBow;
-import net.minecraft.item.ItemHoe;
-import net.minecraft.item.ItemPickaxe;
-import net.minecraft.item.ItemSpade;
-import net.minecraft.item.ItemStack;
-import net.minecraft.item.ItemSword;
+import net.minecraft.item.*;
 import net.minecraft.item.crafting.CraftingManager;
 import net.minecraft.item.crafting.IRecipe;
+import net.minecraft.item.crafting.Ingredient;
 import net.minecraft.nbt.NBTTagByte;
 import net.minecraft.nbt.NBTTagCompound;
+import net.minecraft.util.NonNullList;
+import net.minecraft.util.ResourceLocation;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.World;
+import net.minecraftforge.common.crafting.CraftingHelper;
 import net.minecraftforge.common.crafting.IShapedRecipe;
 import net.minecraftforge.oredict.OreDictionary;
 import twilightforest.TFConfig;
 import twilightforest.block.TFBlocks;
+import twilightforest.item.recipe.UncraftingRecipe;
+import twilightforest.item.recipe.UncraftingShapedRecipe;
+import twilightforest.item.recipe.UncraftingShapelessRecipe;
 import twilightforest.util.TFItemStackUtils;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 public class ContainerTFUncrafting extends Container {
 
 	private static final String TAG_MARKER = "TwilightForestMarker";
+
+	private static final Hash.Strategy<ItemStack> ITEMSTACK_STRATEGY = new Hash.Strategy<ItemStack>() {
+		@Override
+		public int hashCode(ItemStack o) {
+			if (o == null || o.isEmpty()) return 0;
+			int i = Item.getIdFromItem(o.getItem()) << 17;
+			i |= (o.getMetadata() + 1) << 31;
+			if (o.hasTagCompound()) i |= Objects.hashCode(o.getTagCompound()) << 13;
+			return i;
+		}
+		@Override
+		public boolean equals(ItemStack a, ItemStack b) {
+			if (a == null || b == null) return false;
+			boolean nbt = !a.hasTagCompound() || Objects.requireNonNull(a.getTagCompound()).equals(Objects.requireNonNull(b.getTagCompound()));
+			return a.isItemEqual(b) && nbt;
+		}
+	};
+
+	private static final Set<ItemStack> STACK_CHECK = new ObjectOpenCustomHashSet<>(ITEMSTACK_STRATEGY);
+	private static final Set<ResourceLocation> RECIPE_CHECK = TFConfig.initializeUncraftingList();
+	private static final boolean IS_WHITELIST = TFConfig.whitelistUncrafting;
+
+	private static final Map<ItemStack, List<IRecipe>> ADDITIONAL_RECIPES = new Object2ObjectOpenCustomHashMap<>(ITEMSTACK_STRATEGY);
+
+	private static IRecipe currRecipe;
+
+	public static void addStackToList(ItemStack stack) {
+		STACK_CHECK.add(stack);
+	}
+
+	public static void addRecipeToList(String location) {
+		RECIPE_CHECK.add(new ResourceLocation(location));
+	}
+
+	public static void addRecipeToList(ResourceLocation location) {
+		RECIPE_CHECK.add(location);
+	}
+
+	public static void addRecipe(ItemStack input, IRecipe recipe) {
+		List<IRecipe> list = ADDITIONAL_RECIPES.computeIfAbsent(input, k -> new ArrayList<>(1));
+		list.add(recipe);
+	}
+
+	public static void addShapedRecipe(ItemStack input, int cost, Object... inputs) {
+		CraftingHelper.ShapedPrimer primer = CraftingHelper.parseShaped(inputs);
+		addRecipe(input, new UncraftingShapedRecipe(primer.width, primer.height, primer.input, input, cost));
+	}
+
+	public static void addShapelessRecipe(ItemStack input, int cost, Ingredient... inputs) {
+		NonNullList<Ingredient> output = NonNullList.create();
+        output.addAll(Arrays.asList(inputs));
+		addRecipe(input, new UncraftingShapelessRecipe(input, output, cost));
+	}
 
 	// Inaccessible grid, for uncrafting logic
 	private final InventoryTFGoblinUncrafting uncraftingMatrix = new InventoryTFGoblinUncrafting(this);
@@ -117,6 +171,7 @@ public class ContainerTFUncrafting extends Container {
 				IRecipe recipe = recipes[Math.floorMod(this.unrecipeInCycle, size)];
 				ItemStack[] recipeItems = getIngredients(recipe);
 
+				currRecipe = recipe;
 				if (recipe instanceof IShapedRecipe) {
 
 					int recipeWidth  = getRecipeWidth ((IShapedRecipe) recipe);
@@ -276,6 +331,14 @@ public class ContainerTFUncrafting extends Container {
 		TFItemStackUtils.clearInfoTag(stack, TAG_MARKER);
 	}
 
+	public static boolean isAllowed(ItemStack stack) {
+		return IS_WHITELIST == STACK_CHECK.contains(stack);
+	}
+
+	public static boolean isAllowed(IRecipe recipe) {
+		return IS_WHITELIST == RECIPE_CHECK.contains(recipe.getRegistryName());
+	}
+
 	private static boolean isIngredientProblematic(ItemStack ingredient) {
 		return !ingredient.isEmpty() && ingredient.getItem().hasContainerItem(ingredient);
 	}
@@ -295,17 +358,16 @@ public class ContainerTFUncrafting extends Container {
 	}
 
 	private static IRecipe[] getRecipesFor(ItemStack inputStack) {
-
-		List<IRecipe> recipes = new ArrayList<>();
-
-		if (!inputStack.isEmpty()) {
-			for (IRecipe recipe : CraftingManager.REGISTRY) {
-				if (recipe.canFit(3, 3) && !recipe.getIngredients().isEmpty() && matches(inputStack, recipe.getRecipeOutput())) {
-					recipes.add(recipe);
-				}
+		if (inputStack.isEmpty() || !isAllowed(inputStack)) return new IRecipe[0];
+		List<IRecipe> recipes = ADDITIONAL_RECIPES.get(inputStack);
+		if (recipes == null) recipes = new ArrayList<>(2);
+		else recipes.forEach(System.out::println);
+		for (IRecipe recipe : CraftingManager.REGISTRY) {
+			if (!isAllowed(recipe)) continue;
+			if (recipe.canFit(3, 3) && !recipe.getIngredients().isEmpty() && matches(inputStack, recipe.getRecipeOutput())) {
+				recipes.add(recipe);
 			}
 		}
-
 		return recipes.toArray(new IRecipe[0]);
 	}
 
@@ -566,6 +628,7 @@ public class ContainerTFUncrafting extends Container {
 				count++;
 			}
 		}
+		if (count > 0 && currRecipe instanceof UncraftingRecipe) return ((UncraftingRecipe) currRecipe).getCost();
 		return count;
 	}
 

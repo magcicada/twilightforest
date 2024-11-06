@@ -19,9 +19,7 @@ import net.minecraftforge.oredict.OreDictionary;
 import twilightforest.world.WorldProviderTwilightForest;
 import twilightforest.world.feature.TFGenCaveStalactite;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 
 @SuppressWarnings("WeakerAccess")
 @Config(modid = TwilightForestMod.ID)
@@ -273,6 +271,24 @@ public class TFConfig {
 	@Config.LangKey(config + "uncrafting")
 	@Config.Comment("Disable the uncrafting function of the uncrafting table. Provided as an option when interaction with other mods produces exploitable recipes.")
 	public static boolean disableUncrafting = false;
+
+	@Config.RequiresMcRestart
+	@Config.LangKey(config + "uncrafting.whitelist")
+	@Config.Comment("Turn uncrafting check list to whitelist lists. They're blacklist by default.")
+	public static boolean whitelistUncrafting = false;
+
+	@Config.RequiresMcRestart
+	@Config.LangKey(config + "uncrafting.list")
+	@Config.Comment("Uncrafting list for blacklisting or whitelisting recipes.")
+	public static String[] uncraftingList = new String[0];
+
+	public static Set<ResourceLocation> initializeUncraftingList() {
+		Set<ResourceLocation> RECIPE_LIST = new HashSet<>();
+		for (String str : uncraftingList) {
+			RECIPE_LIST.add(new ResourceLocation(str));
+		}
+		return RECIPE_LIST;
+	}
 
 	@Config.LangKey(config + "antibuilder_blacklist")
 	@Config.Comment("Anti-Builder blacklist. (domain:block:meta) meta is optional.")

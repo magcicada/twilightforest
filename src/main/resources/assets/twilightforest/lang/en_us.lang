@@ -723,6 +723,12 @@ twilightforest.config.progression_default.tooltip=Sets the default value of the 
 twilightforest.config.uncrafting=Disable Uncrafting in Uncrafting Table
 twilightforest.config.uncrafting.tooltip=Disable the uncrafting function of the uncrafting table. Provided as an option when interaction with other mods produces exploitable recipes.
 
+twilightforest.config.uncrafting_whitelist=Turn Uncrafting List to Whitelist
+twilightforest.config.uncrafting_whitelist.tooltip=Turn uncrafting check list to whitelist lists. It's blacklist by default.
+
+twilightforest.config.uncrafting_list=Uncrafting List
+twilightforest.config.uncrafting_list.tooltip=Uncrafting list for blacklisting or whitelisting recipes.
+
 twilightforest.config.antibuilder_blacklist=Antibuilder Blacklist
 twilightforest.config.antibuilder_blacklist.tooltip=Anti-Builder blacklist. (domain:block:meta) meta is optional.
 
