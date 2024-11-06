@@ -4,6 +4,7 @@ import it.unimi.dsi.fastutil.Hash;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenCustomHashMap;
 import net.minecraft.block.Block;
 import net.minecraft.block.state.IBlockState;
+import net.minecraft.client.Minecraft;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityList;
 import net.minecraft.entity.EntityLiving;
@@ -108,94 +109,55 @@ public class ItemTFTransformPowder extends ItemTF {
 		return out == null ? ItemStack.EMPTY : out;
 	}
 
+	@SuppressWarnings("unused")
 	@SubscribeEvent
 	public void onEntityRightClick(PlayerInteractEvent.EntityInteract event) {
 		World world = event.getWorld();
 		Entity entity = event.getTarget();
 		ItemStack heldItem = event.getItemStack();
-		boolean result = false;
 		if (entity.isDead || heldItem.getItem() != this) return;
-		if (entity instanceof EntityItem) {
-			EntityItem entityItem = (EntityItem) entity;
-			ItemStack stack = entityItem.getItem();
-			ItemStack out = getTransformationItem(stack);
-			if (!out.isEmpty()) {
-				if (world.isRemote) {
-					AxisAlignedBB fanBox = getEffectAABB(event.getEntityPlayer());
-					// particle effect
-					for (int i = 0; i < 30; i++) {
-						world.spawnParticle(EnumParticleTypes.CRIT_MAGIC, fanBox.minX + world.rand.nextFloat() * (fanBox.maxX - fanBox.minX),
-								fanBox.minY + world.rand.nextFloat() * (fanBox.maxY - fanBox.minY),
-								fanBox.minZ + world.rand.nextFloat() * (fanBox.maxZ - fanBox.minZ),
-								0, 0, 0);
-					}
-					event.setResult(Event.Result.ALLOW);
-					return;
-				}
-				if (stack.getCount() == 1) {
-					entityItem.setItem(out.copy());
-					entityItem.setPickupDelay(20);
-				}
-				else {
-					EntityItem outEntity = new EntityItem(world, entity.posX, entity.posY, entity.posZ, out.copy());
-					outEntity.setPickupDelay(20);
-					world.spawnEntity(outEntity);
-				}
-				result = true;
+		ResourceLocation location = transformMap.get(EntityList.getKey(entity));
+		if (location == null) return;
+		Entity newEntity = EntityList.createEntityByIDFromName(location, world);
+		if (newEntity == null) return;
+		event.getEntityPlayer().swingArm(event.getHand());
+		if (world.isRemote) {
+			AxisAlignedBB fanBox = getEffectAABB(event.getEntityPlayer());
+			// particle effect
+			for (int i = 0; i < 30; i++) {
+				world.spawnParticle(EnumParticleTypes.CRIT_MAGIC, fanBox.minX + world.rand.nextFloat() * (fanBox.maxX - fanBox.minX),
+						fanBox.minY + world.rand.nextFloat() * (fanBox.maxY - fanBox.minY),
+						fanBox.minZ + world.rand.nextFloat() * (fanBox.maxZ - fanBox.minZ),
+						0, 0, 0);
 			}
-		}
-		else {
-			if (!world.isRemote) {
-				System.out.println(entity);
-				System.out.println(EntityList.getKey(entity));
-			}
-			ResourceLocation location = transformMap.get(EntityList.getKey(entity));
-			if (location == null) return;
-			Entity newEntity = EntityList.createEntityByIDFromName(location, world);
-			if (newEntity == null) return;
-			if (world.isRemote) {
-				AxisAlignedBB fanBox = getEffectAABB(event.getEntityPlayer());
-				// particle effect
-				for (int i = 0; i < 30; i++) {
-					world.spawnParticle(EnumParticleTypes.CRIT_MAGIC, fanBox.minX + world.rand.nextFloat() * (fanBox.maxX - fanBox.minX),
-							fanBox.minY + world.rand.nextFloat() * (fanBox.maxY - fanBox.minY),
-							fanBox.minZ + world.rand.nextFloat() * (fanBox.maxZ - fanBox.minZ),
-							0, 0, 0);
-				}
-				event.setResult(Event.Result.ALLOW);
-				return;
-			}
-			newEntity.setLocationAndAngles(entity.posX, entity.posY, entity.posZ, entity.rotationYaw, entity.rotationPitch);
-			if (newEntity instanceof EntityLiving) {
-				((EntityLiving) newEntity).onInitialSpawn(world.getDifficultyForLocation(new BlockPos(entity)), null);
-			}
-			try { // try copying what can be copied
-				UUID uuid = newEntity.getUniqueID();
-				newEntity.readFromNBT(entity.writeToNBT(newEntity.writeToNBT(new NBTTagCompound())));
-				newEntity.setUniqueId(uuid);
-			} catch (Exception e) {
-				TwilightForestMod.LOGGER.warn("Couldn't transform entity NBT data: {}", e);
-			}
-			world.spawnEntity(newEntity);
-			result = true;
-			entity.setDead();
-		}
-
-		if (result) {
-			event.getEntityPlayer().swingArm(event.getHand());
-			if (!event.getEntityPlayer().isCreative()) heldItem.shrink(1);
-			if (entity instanceof EntityLiving) {
-				((EntityLiving) entity).spawnExplosionParticle();
-				((EntityLiving) entity).spawnExplosionParticle();
-			}
-			else {
-				this.spawnExplosionParticles(world, entity);
-				this.spawnExplosionParticles(world, entity);
-			}
-			entity.playSound(SoundEvents.ENTITY_ZOMBIE_VILLAGER_CURE, 1.0F + itemRand.nextFloat(), itemRand.nextFloat() * 0.7F + 0.3F);
 			event.setResult(Event.Result.ALLOW);
+			return;
 		}
-	}
+		newEntity.setLocationAndAngles(entity.posX, entity.posY, entity.posZ, entity.rotationYaw, entity.rotationPitch);
+		if (newEntity instanceof EntityLiving) {
+			((EntityLiving) newEntity).onInitialSpawn(world.getDifficultyForLocation(new BlockPos(entity)), null);
+		}
+		try { // try copying what can be copied
+			UUID uuid = newEntity.getUniqueID();
+			newEntity.readFromNBT(entity.writeToNBT(newEntity.writeToNBT(new NBTTagCompound())));
+			newEntity.setUniqueId(uuid);
+		} catch (Exception e) {
+			TwilightForestMod.LOGGER.warn("Couldn't transform entity NBT data: {}", e);
+		}
+		world.spawnEntity(newEntity);
+		entity.setDead();
+        if (!event.getEntityPlayer().isCreative()) heldItem.shrink(1);
+        if (entity instanceof EntityLiving) {
+            ((EntityLiving) entity).spawnExplosionParticle();
+            ((EntityLiving) entity).spawnExplosionParticle();
+        }
+        else {
+            this.spawnExplosionParticles(world, entity);
+            this.spawnExplosionParticles(world, entity);
+        }
+        entity.playSound(SoundEvents.ENTITY_ZOMBIE_VILLAGER_CURE, 1.0F + itemRand.nextFloat(), itemRand.nextFloat() * 0.7F + 0.3F);
+        event.setResult(Event.Result.ALLOW);
+    }
 
 	@Override
 	public EnumActionResult onItemUse(EntityPlayer player, World world, BlockPos pos, EnumHand hand, EnumFacing facing, float hitX, float hitY, float hitZ) {
