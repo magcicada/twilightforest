@@ -71,6 +71,14 @@ public class ItemTFTransformPowder extends ItemTF {
 		transformBlockMap.put(from, Pair.of(predicate, to));
 	}
 
+	public static boolean removeEntityTransformation(ResourceLocation from) {
+		return transformMap.remove(from) != null;
+	}
+
+	public static void removeAll() {
+		transformMap.clear();
+	}
+
 	public static void addBlockTransformation(Block from, int meta, IBlockState to) {
 		addBlockTransformation(from, state -> from.getMetaFromState(state) == meta, to);
 	}

@@ -39,6 +39,26 @@ public class CTTransformationPowder {
     }
 
     @ZenMethod
+    public static void removeEntityTransformation(IEntityDefinition from) {
+        EntityEntry in = (EntityEntry) from.getInternal();
+        if (!ItemTFTransformPowder.removeEntityTransformation(Objects.requireNonNull(in.getRegistryName()))) {
+            CraftTweakerAPI.logError("Could not find transformation for " + from);
+        }
+    }
+
+    @ZenMethod
+    public static void removeEntityTransformation(String from) {
+        if (!ItemTFTransformPowder.removeEntityTransformation(new ResourceLocation(from))) {
+            CraftTweakerAPI.logError("Could not find transformation for " + from);
+        }
+    }
+
+    @ZenMethod
+    public static void removeAll() {
+        ItemTFTransformPowder.removeAll();
+    }
+
+    @ZenMethod
     public static void addBlockTransformation(IIngredient from, IItemStack to) {
         ItemStack outStack = CraftTweakerMC.getItemStack(to);
         if (!(outStack.getItem() instanceof ItemBlock)) {
