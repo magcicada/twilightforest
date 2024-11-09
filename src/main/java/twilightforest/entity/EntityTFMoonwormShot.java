@@ -3,8 +3,13 @@ package twilightforest.entity;
 import net.minecraft.block.Block;
 import net.minecraft.block.BlockDirectional;
 import net.minecraft.block.state.IBlockState;
+import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.entity.item.EntityItem;
+import net.minecraft.inventory.EntityEquipmentSlot;
+import net.minecraft.item.Item;
+import net.minecraft.item.ItemArmor;
+import net.minecraft.item.ItemStack;
 import net.minecraft.util.DamageSource;
 import net.minecraft.util.EnumParticleTypes;
 import net.minecraft.util.SoundCategory;
@@ -121,12 +126,33 @@ public class EntityTFMoonwormShot extends EntityTFThrowable {
 
 				if (currentState.getBlock().isReplaceable(world, pos)) {
 					world.setBlockState(pos, TFBlocks.moonworm.getDefaultState().withProperty(BlockDirectional.FACING, ray.sideHit));
-					// todo sound
+					this.playSound(TFBlocks.moonworm.getSoundType(TFBlocks.moonworm.getDefaultState(), world, new BlockPos(this), this).getPlaceSound(), 1F, 1F);
 				}
 			}
 
 			if (ray.entityHit != null) {
-				ray.entityHit.attackEntityFrom(DamageSource.causeThrownDamage(this, this.getThrower()), 0);
+				Entity entity = ray.entityHit;
+				// TODO Maybe a new damage source
+				entity.attackEntityFrom(DamageSource.causeThrownDamage(this, this.getThrower()), 0);
+				if (!entity.isDead && entity instanceof EntityLivingBase) {
+					EntityLivingBase living = (EntityLivingBase) entity;
+					ItemStack helmet = living.getItemStackFromSlot(EntityEquipmentSlot.HEAD);
+					if (helmet.getItem() == Item.getItemFromBlock(TFBlocks.moonworm)) return;
+					if (!helmet.isEmpty()) {
+						float chance = 0.5F;
+						if (helmet.getItem() instanceof ItemArmor) {
+							ItemArmor.ArmorMaterial material = ((ItemArmor) helmet.getItem()).getArmorMaterial();
+							if (material.getToughness() > 0.0F) chance /= material.getToughness();
+							if (material.getDamageReductionAmount(EntityEquipmentSlot.HEAD) > 1) chance -= Math.min(chance, 0.025F * material.getDamageReductionAmount(EntityEquipmentSlot.HEAD));
+						}
+						if (rand.nextFloat() < chance) {
+							living.entityDropItem(helmet, 0.2F);
+							living.setItemStackToSlot(EntityEquipmentSlot.HEAD, new ItemStack(TFBlocks.moonworm));
+						}
+						return;
+					}
+					living.setItemStackToSlot(EntityEquipmentSlot.HEAD, new ItemStack(TFBlocks.moonworm));
+				}
 			}
 
 			this.world.setEntityState(this, (byte) 3);

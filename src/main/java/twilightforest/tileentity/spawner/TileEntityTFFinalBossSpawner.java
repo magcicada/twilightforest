@@ -20,4 +20,9 @@ public class TileEntityTFFinalBossSpawner extends TileEntityTFBossSpawner {
 		myCreature.getEntityAttribute(SharedMonsterAttributes.MAX_HEALTH).setBaseValue(1024);
 		myCreature.setHealth(myCreature.getMaxHealth());
 	}
+
+	@Override
+	protected EntityLiving makeMyCreature() {
+		return super.makeMyCreature();
+	}
 }
