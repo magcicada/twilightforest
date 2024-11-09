@@ -218,6 +218,7 @@ public class TFEventListener {
 		if (block instanceof BlockTFCritter) {
 			World world = living.world;
 			BlockTFCritter poorBug = (BlockTFCritter) block;
+			if (!living.isDead && !(living instanceof EntityPlayer) && world.rand.nextFloat() >= 0.25F) return;
 			if (!world.isRemote) {
 				EntityItem entity = new EntityItem(world, living.posX, living.posY + living.getEyeHeight(), living.posZ, poorBug.getSquishResult());
 				entity.setPickupDelay(20);
@@ -225,6 +226,7 @@ public class TFEventListener {
 				entity.motionY = world.rand.nextDouble() / 3D;
 				entity.motionZ = (-0.5D + world.rand.nextDouble()) / 4D;
 				world.spawnEntity(entity);
+				living.setItemStackToSlot(EntityEquipmentSlot.HEAD, ItemStack.EMPTY);
 			}
 			else {
 				int stateId = Block.getStateId(poorBug.getDefaultState());
