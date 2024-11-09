@@ -3,10 +3,13 @@ package twilightforest;
 import com.google.common.collect.ImmutableSet;
 import net.minecraft.block.Block;
 import net.minecraft.block.state.IBlockState;
+import net.minecraft.enchantment.EnchantmentHelper;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.entity.SharedMonsterAttributes;
+import net.minecraft.entity.item.EntityItem;
 import net.minecraft.entity.monster.IMob;
+import net.minecraft.entity.passive.EntityChicken;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.entity.player.InventoryPlayer;
@@ -14,6 +17,7 @@ import net.minecraft.entity.projectile.EntityArrow;
 import net.minecraft.entity.projectile.EntityFireball;
 import net.minecraft.entity.projectile.EntityThrowable;
 import net.minecraft.init.Blocks;
+import net.minecraft.init.Enchantments;
 import net.minecraft.init.MobEffects;
 import net.minecraft.init.SoundEvents;
 import net.minecraft.inventory.EntityEquipmentSlot;
@@ -25,8 +29,10 @@ import net.minecraft.network.NetHandlerPlayServer;
 import net.minecraft.network.play.INetHandlerPlayServer;
 import net.minecraft.potion.PotionEffect;
 import net.minecraft.util.DamageSource;
+import net.minecraft.util.EnumParticleTypes;
 import net.minecraft.util.NonNullList;
 import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.MathHelper;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.GameRules;
 import net.minecraft.world.World;
@@ -34,11 +40,8 @@ import net.minecraft.world.gen.structure.StructureBoundingBox;
 import net.minecraftforge.common.util.FakePlayer;
 import net.minecraftforge.event.GameRuleChangeEvent;
 import net.minecraftforge.event.entity.ProjectileImpactEvent;
-import net.minecraftforge.event.entity.living.LivingAttackEvent;
-import net.minecraftforge.event.entity.living.LivingDeathEvent;
-import net.minecraftforge.event.entity.living.LivingEquipmentChangeEvent;
+import net.minecraftforge.event.entity.living.*;
 import net.minecraftforge.event.entity.living.LivingEvent.LivingUpdateEvent;
-import net.minecraftforge.event.entity.living.LivingHurtEvent;
 import net.minecraftforge.event.entity.player.AdvancementEvent;
 import net.minecraftforge.event.entity.player.PlayerEvent;
 import net.minecraftforge.event.entity.player.PlayerInteractEvent;
@@ -213,10 +216,40 @@ public class TFEventListener {
 		ItemStack stack = living.getItemStackFromSlot(EntityEquipmentSlot.HEAD);
 		Block block = Block.getBlockFromItem(stack.getItem());
 		if (block instanceof BlockTFCritter) {
+			World world = living.world;
 			BlockTFCritter poorBug = (BlockTFCritter) block;
-			living.setItemStackToSlot(EntityEquipmentSlot.HEAD, poorBug.getSquishResult());
-			living.world.playSound(null, living.posX, living.posY, living.posZ, poorBug.getSoundType().getBreakSound(), living.getSoundCategory(), 1, 1);
+			if (!world.isRemote) {
+				EntityItem entity = new EntityItem(world, living.posX, living.posY + living.getEyeHeight(), living.posZ, poorBug.getSquishResult());
+				entity.setPickupDelay(20);
+				entity.motionX = (-0.5D + world.rand.nextDouble()) / 4D;
+				entity.motionY = world.rand.nextDouble() / 3D;
+				entity.motionZ = (-0.5D + world.rand.nextDouble()) / 4D;
+				world.spawnEntity(entity);
+			}
+			else {
+				int stateId = Block.getStateId(poorBug.getDefaultState());
+				for (int i = 0; i < 8; ++i) {
+					world.spawnParticle(EnumParticleTypes.BLOCK_CRACK, living.posX, living.posY + living.getEyeHeight(), living.posZ, 0.0D, 0.0D, 0.0D, stateId);
+				}
+			}
+			world.playSound(null, living.posX, living.posY + living.getEyeHeight(), living.posZ, poorBug.getSoundType(poorBug.getDefaultState(), world, new BlockPos(living), living).getBreakSound(), living.getSoundCategory(), 1F, 1F);
 		}
+	}
+
+	@SubscribeEvent
+	public static void entityFall(LivingFallEvent event) {
+		EntityLivingBase entity = event.getEntityLiving();
+		World world = entity.world;
+		double speed = -entity.motionY;
+		if (entity instanceof EntityPlayer) System.out.println(speed);
+		double maxSpeed = 0.07D;
+		ItemStack boots = entity.getItemStackFromSlot(EntityEquipmentSlot.FEET);
+		if (!boots.isEmpty()) maxSpeed *= EnchantmentHelper.getEnchantmentLevel(Enchantments.FEATHER_FALLING, boots);
+		if (entity instanceof EntityChicken || speed < maxSpeed) return;
+		BlockPos pos = new BlockPos(entity);
+		IBlockState state = world.getBlockState(pos);
+		if (!(state.getBlock() instanceof BlockTFCritter)) return;
+		((BlockTFCritter) state.getBlock()).squish(world, pos, entity);
 	}
 
 	@SubscribeEvent(priority = EventPriority.HIGHEST)

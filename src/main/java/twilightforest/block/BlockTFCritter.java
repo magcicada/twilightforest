@@ -7,12 +7,21 @@ import net.minecraft.block.material.Material;
 import net.minecraft.block.state.BlockFaceShape;
 import net.minecraft.block.state.BlockStateContainer;
 import net.minecraft.block.state.IBlockState;
+import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityLivingBase;
+import net.minecraft.entity.IProjectile;
+import net.minecraft.entity.item.EntityItem;
+import net.minecraft.entity.player.EntityPlayer;
+import net.minecraft.entity.projectile.EntityArrow;
+import net.minecraft.entity.projectile.EntitySnowball;
 import net.minecraft.item.ItemStack;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.EnumFacing;
+import net.minecraft.util.EnumParticleTypes;
+import net.minecraft.util.NonNullList;
 import net.minecraft.util.math.AxisAlignedBB;
 import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.MathHelper;
 import net.minecraft.world.IBlockAccess;
 import net.minecraft.world.World;
 import twilightforest.item.TFItems;
@@ -36,6 +45,16 @@ public abstract class BlockTFCritter extends Block {
 		this.setCreativeTab(TFItems.creativeTab);
 		this.setSoundType(SoundType.SLIME);
 		this.setDefaultState(blockState.getBaseState().withProperty(BlockDirectional.FACING, EnumFacing.UP));
+	}
+
+	@Override
+	public boolean canSilkHarvest(World world, BlockPos pos, IBlockState state, EntityPlayer player) {
+		return true;
+	}
+
+	@Override
+	public void getDrops(NonNullList<ItemStack> drops, IBlockAccess world, BlockPos pos, IBlockState state, int fortune) {
+		drops.add(this.getSquishResult());
 	}
 
 	public float getWidth() {
@@ -154,6 +173,13 @@ public abstract class BlockTFCritter extends Block {
 		checkAndDrop(world, pos, state);
 	}
 
+	@Override
+	public void onEntityCollision(World worldIn, BlockPos pos, IBlockState state, Entity entityIn) {
+		if (!(entityIn instanceof IProjectile) || entityIn instanceof EntitySnowball) super.onEntityCollision(worldIn, pos, state, entityIn);
+		float speed = MathHelper.sqrt(entityIn.motionX * entityIn.motionX + entityIn.motionY * entityIn.motionY + entityIn.motionZ * entityIn.motionZ);
+		if (speed > 0.5F) this.squish(worldIn, pos, entityIn);
+	}
+
 	protected boolean canPlaceAt(IBlockAccess world, BlockPos pos, EnumFacing facing) {
 		IBlockState state = world.getBlockState(pos);
 		return state.getBlockFaceShape(world, pos, facing) == BlockFaceShape.SOLID
@@ -164,6 +190,25 @@ public abstract class BlockTFCritter extends Block {
 	@Override
 	public boolean hasTileEntity(IBlockState state) {
 		return true;
+	}
+
+	public void squish(World world, BlockPos pos, Entity entityIn) {
+		if (!world.isRemote) {
+			EntityItem entity = new EntityItem(world, pos.getX() + 0.5D, pos.getY() + 0.1D, pos.getZ() + 0.5D, this.getSquishResult());
+			entity.setPickupDelay(20);
+			entity.motionX = (-0.5D + world.rand.nextDouble()) / 4D;
+			entity.motionY = world.rand.nextDouble() / 3D;
+			entity.motionZ = (-0.5D + world.rand.nextDouble()) / 4D;
+			world.spawnEntity(entity);
+			world.setBlockToAir(pos);
+		}
+		else {
+			int stateId = Block.getStateId(this.getDefaultState());
+			for (int i = 0; i < 8; ++i) {
+				world.spawnParticle(EnumParticleTypes.BLOCK_CRACK, pos.getX() + 0.5D, pos.getY() + 0.1D, pos.getZ() + 0.5D, 0.0D, 0.0D, 0.0D, stateId);
+			}
+		}
+		world.playSound(null, pos.getX(), pos.getY(), pos.getZ(), this.getSoundType(world.getBlockState(pos), world, pos, entityIn).getBreakSound(), entityIn.getSoundCategory(), 1F, 1F);
 	}
 
 	@Override

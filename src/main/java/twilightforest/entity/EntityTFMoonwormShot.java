@@ -4,14 +4,17 @@ import net.minecraft.block.Block;
 import net.minecraft.block.BlockDirectional;
 import net.minecraft.block.state.IBlockState;
 import net.minecraft.entity.EntityLivingBase;
+import net.minecraft.entity.item.EntityItem;
 import net.minecraft.util.DamageSource;
 import net.minecraft.util.EnumParticleTypes;
+import net.minecraft.util.SoundCategory;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.RayTraceResult;
 import net.minecraft.util.math.RayTraceResult.Type;
 import net.minecraft.world.World;
 import net.minecraftforge.fml.relauncher.Side;
 import net.minecraftforge.fml.relauncher.SideOnly;
+import twilightforest.block.BlockTFMoonworm;
 import twilightforest.block.TFBlocks;
 
 public class EntityTFMoonwormShot extends EntityTFThrowable {
@@ -42,6 +45,29 @@ public class EntityTFMoonwormShot extends EntityTFThrowable {
 		return 15728880;
 	}
 
+	// TODO Add an advancement
+	@Override
+	public boolean attackEntityFrom(DamageSource source, float amount) {
+		if (!source.isProjectile()) super.attackEntityFrom(source, amount);
+		BlockTFMoonworm moonworm = (BlockTFMoonworm) TFBlocks.moonworm;
+		if (!world.isRemote) {
+			EntityItem entity = new EntityItem(world, this.posX, this.posY, this.posZ, moonworm.getSquishResult());
+			entity.setPickupDelay(20);
+			entity.motionX = this.motionX;
+			entity.motionY = this.motionY;
+			entity.motionZ = this.motionZ;
+			world.spawnEntity(entity);
+			this.setDead();
+		}
+		else {
+			int stateId = Block.getStateId(moonworm.getDefaultState());
+			for (int i = 0; i < 8; ++i) {
+				world.spawnParticle(EnumParticleTypes.BLOCK_CRACK, this.posX, this.posY, this.posZ, 0.0D, 0.0D, 0.0D, stateId);
+			}
+		}
+		this.playSound(moonworm.getSoundType(moonworm.getDefaultState(), world, new BlockPos(this), this).getBreakSound(), 1F, 1F);
+		return true;
+	}
 
 	private void makeTrail() {
 //		for (int i = 0; i < 5; i++) {

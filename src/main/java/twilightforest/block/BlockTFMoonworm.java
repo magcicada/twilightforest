@@ -10,7 +10,9 @@ import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.EnumFacing;
+import net.minecraft.util.NonNullList;
 import net.minecraft.util.math.BlockPos;
+import net.minecraft.world.IBlockAccess;
 import net.minecraft.world.World;
 import net.minecraftforge.client.ForgeHooksClient;
 import net.minecraftforge.client.model.ModelLoader;
@@ -42,15 +44,15 @@ public class BlockTFMoonworm extends BlockTFCritter implements ModelRegisterCall
 	protected boolean checkAndDrop(World world, BlockPos pos, IBlockState state) {
 		EnumFacing facing = state.getValue(BlockDirectional.FACING);
 		if (!canPlaceAt(world, pos.offset(facing.getOpposite()), facing)) {
-			world.destroyBlock(pos, false);
+			world.destroyBlock(pos, true);
 			return false;
 		}
 		return true;
 	}
 
 	@Override
-	public int quantityDropped(IBlockState state, int fortune, Random random) {
-		return 0;
+	public void getDrops(NonNullList<ItemStack> drops, IBlockAccess world, BlockPos pos, IBlockState state, int fortune) {
+		drops.add(this.getSquishResult());
 	}
 
 	@Override
